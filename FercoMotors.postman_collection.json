@@ -1,0 +1,161 @@
+{
+  "info": {
+    "_postman_id": "f37c0a10-4b6e-4c2a-9f1e-fercomotors0001",
+    "name": "FercoMotors API",
+    "description": "API REST de FercoMotors (coches, contacto y sincronizacion). baseUrl por defecto: http://localhost:5080",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5080", "type": "string" },
+    { "key": "carId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Listar coches",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/cars?sort=priceDesc",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "cars"],
+          "query": [
+            { "key": "q", "value": "toyota", "disabled": true },
+            { "key": "fuel", "value": "Gasolina", "disabled": true },
+            { "key": "body", "value": "SUV/Crossover", "disabled": true },
+            { "key": "maxPrice", "value": "20000", "disabled": true },
+            { "key": "minYear", "value": "2018", "disabled": true },
+            { "key": "maxMileage", "value": "80000", "disabled": true },
+            { "key": "sort", "value": "priceDesc", "description": "priceAsc | priceDesc | make" }
+          ]
+        },
+        "description": "Lista el inventario. Filtros opcionales (activa/desactiva los query params)."
+      }
+    },
+    {
+      "name": "Obtener coche por id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/cars/{{carId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "cars", "{{carId}}"]
+        },
+        "description": "Usa la variable carId (se rellena sola al crear un coche)."
+      }
+    },
+    {
+      "name": "Crear coche",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  var j = pm.response.json();",
+              "  pm.collectionVariables.set('carId', j.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla\",\n  \"version\": \"LE 4D Sedan\",\n  \"year\": 2021,\n  \"price\": 15999,\n  \"mileage\": 42000,\n  \"fuel\": \"Gasolina\",\n  \"transmission\": \"Automatico\",\n  \"power\": 0,\n  \"doors\": 4,\n  \"color\": \"Blanco\",\n  \"body\": \"Sedan\",\n  \"location\": \"Miami, FL\",\n  \"description\": \"Creado desde Postman\",\n  \"images\": [\"https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=1200\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/cars",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "cars"]
+        },
+        "description": "Crea un coche. Guarda el id devuelto en carId."
+      }
+    },
+    {
+      "name": "Actualizar coche",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla\",\n  \"version\": \"SE 4D Sedan\",\n  \"year\": 2021,\n  \"price\": 14499,\n  \"mileage\": 43500,\n  \"fuel\": \"Gasolina\",\n  \"transmission\": \"Automatico\",\n  \"power\": 0,\n  \"doors\": 4,\n  \"color\": \"Gris\",\n  \"body\": \"Sedan\",\n  \"location\": \"Miami, FL\",\n  \"description\": \"Actualizado desde Postman\",\n  \"images\": [\"https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=1200\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/cars/{{carId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "cars", "{{carId}}"]
+        },
+        "description": "Actualiza el coche cuyo id esta en carId."
+      }
+    },
+    {
+      "name": "Eliminar coche",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/cars/{{carId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "cars", "{{carId}}"]
+        },
+        "description": "Elimina el coche cuyo id esta en carId. Devuelve 204."
+      }
+    },
+    {
+      "name": "Enviar contacto",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"carTitle\": \"Toyota Corolla\",\n  \"name\": \"Ana Revilla\",\n  \"email\": \"ana@example.com\",\n  \"phone\": \"600123123\",\n  \"message\": \"Interesada en este coche, sigue disponible?\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/contact",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "contact"]
+        },
+        "description": "Registra una solicitud de contacto. Devuelve 202."
+      }
+    },
+    {
+      "name": "Sincronizar inventario (prueba: 1 pagina)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-Sync-Token", "value": "", "description": "Solo si definiste SYNC_TOKEN", "disabled": true }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/sync?maxPages=1",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "sync"],
+          "query": [
+            { "key": "maxPages", "value": "1", "description": "Paginas a scrapear (quitar para todo)" },
+            { "key": "maxCars", "value": "5", "description": "Limite de coches", "disabled": true }
+          ]
+        },
+        "description": "Sincroniza con fercomotors.com (upsert por VIN). maxPages=1 para probar rapido."
+      }
+    },
+    {
+      "name": "Sincronizar inventario (completo)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-Sync-Token", "value": "", "description": "Solo si definiste SYNC_TOKEN", "disabled": true }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/sync",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "sync"]
+        },
+        "description": "Sincroniza TODO el inventario. Tarda 1-2 minutos."
+      }
+    }
+  ]
+}
