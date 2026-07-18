@@ -224,3 +224,17 @@ def start_scheduler():
 def stop_scheduler():
     if _scheduler:
         _scheduler.shutdown(wait=False)
+
+
+@app.get("/")
+def root():
+    return {
+        "ok": True,
+        "service": "FercoMotors API",
+        "docs": "/docs",
+    }
+
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
