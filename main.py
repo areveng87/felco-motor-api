@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 import sync as sync_module
+from auth import get_current_user
 from database import Base, SessionLocal, engine
 
 # Configuracion de sincronizacion (via variables de entorno)
@@ -77,6 +78,18 @@ def seed_inventory():
         print(f"Sembrados {len(data)} coches desde inventory.json")
     finally:
         db.close()
+
+
+@app.get("/")
+def root():
+    """Raiz: util como comprobacion rapida y para keep-alive."""
+    return {"service": "FercoMotors API", "status": "ok", "docs": "/docs"}
+
+
+@app.get("/health")
+def health():
+    """Endpoint ligero para pings de keep-alive / monitorizacion."""
+    return {"status": "ok"}
 
 
 @app.get("/v1/cars", response_model=List[schemas.CarOut])
@@ -158,6 +171,42 @@ def delete_car(car_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Coche no encontrado")
     db.delete(car)
     db.commit()
+
+
+@app.get("/v1/me")
+def me(user=Depends(get_current_user)):
+    """Devuelve el usuario autenticado (a partir del token de Firebase)."""
+    return {"uid": user["uid"], "email": user["email"], "name": user.get("name"), "picture": user.get("picture")}
+
+
+@app.get("/v1/favorites", response_model=List[schemas.CarOut])
+def list_favorites(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Coches marcados como favoritos por el usuario autenticado."""
+    ids = [f.car_id for f in db.query(models.Favorite).filter(models.Favorite.user_uid == user["uid"]).all()]
+    if not ids:
+        return []
+    return db.query(models.Car).filter(models.Car.id.in_(ids)).all()
+
+
+@app.post("/v1/favorites/{car_id}", status_code=status.HTTP_201_CREATED)
+def add_favorite(car_id: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Marca un coche como favorito para el usuario."""
+    if db.get(models.Car, car_id) is None:
+        raise HTTPException(status_code=404, detail="Coche no encontrado")
+    exists = db.query(models.Favorite).filter_by(user_uid=user["uid"], car_id=car_id).first()
+    if exists is None:
+        db.add(models.Favorite(user_uid=user["uid"], car_id=car_id))
+        db.commit()
+    return {"status": "ok", "carId": car_id}
+
+
+@app.delete("/v1/favorites/{car_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_favorite(car_id: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Quita un coche de favoritos del usuario."""
+    fav = db.query(models.Favorite).filter_by(user_uid=user["uid"], car_id=car_id).first()
+    if fav is not None:
+        db.delete(fav)
+        db.commit()
 
 
 @app.post("/v1/contact", status_code=status.HTTP_202_ACCEPTED)

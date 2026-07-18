@@ -1,0 +1,35 @@
+# Render Blueprint (infra como código) para FercoMotors API.
+# Uso: en Render -> New -> Blueprint -> conecta el repo. Detecta este archivo
+# y crea el servicio web + la base de datos Postgres con sus variables.
+#
+# NOTA sobre rootDir: si tu repositorio tiene la API en la subcarpeta
+# "ferco-api-python", deja el rootDir. Si el repo YA es esa carpeta (el
+# requirements.txt está en la raíz), borra la línea rootDir.
+
+databases:
+  - name: ferco-db
+    plan: free
+    databaseName: ferco
+    user: ferco
+
+services:
+  - type: web
+    name: felco-motor-api
+    runtime: python
+    plan: free
+    rootDir: ferco-api-python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ferco-db
+          property: connectionString
+      - key: SYNC_INTERVAL_HOURS
+        value: "0"            # sync la dispara el cron externo (más fiable en Free)
+      - key: SYNC_TOKEN
+        generateValue: true   # token aleatorio para proteger POST /v1/sync
+      - key: PYTHON_VERSION
+        value: "3.12.4"

@@ -1,7 +1,7 @@
 """Modelos de base de datos."""
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, Text, DateTime, JSON
+from sqlalchemy import Column, String, Integer, Float, Text, DateTime, JSON, UniqueConstraint
 from database import Base
 
 
@@ -32,6 +32,17 @@ class Car(Base):
     status = Column(String(20), default="available")    # available | sold
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Favorite(Base):
+    __tablename__ = "favorites"
+
+    id = Column(String(32), primary_key=True, default=new_id)
+    user_uid = Column(String(128), index=True, nullable=False)   # UID de Firebase
+    car_id = Column(String(32), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("user_uid", "car_id", name="uq_fav_user_car"),)
 
 
 class ContactMessage(Base):

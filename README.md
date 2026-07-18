@@ -45,6 +45,23 @@ Luego abre la app: los datos entran por el túnel USB. En el navegador del móvi
 | DELETE | `/v1/cars/{id}` | Eliminar |
 | POST | `/v1/contact` | Registrar solicitud de contacto |
 | POST | `/v1/sync` | Sincroniza el inventario con fercomotors.com (params opcionales `maxPages`, `maxCars`) |
+| GET | `/` y `/health` | Estado del servicio (útil para keep-alive/monitorización) |
+| GET | `/v1/me` | Usuario autenticado (requiere token de Firebase) |
+| GET | `/v1/favorites` | Coches favoritos del usuario (requiere auth) |
+| POST | `/v1/favorites/{id}` | Añadir a favoritos (requiere auth) |
+| DELETE | `/v1/favorites/{id}` | Quitar de favoritos (requiere auth) |
+
+## Autenticación (Firebase)
+
+Los endpoints de favoritos requieren que el usuario esté autenticado. La app inicia sesión con **Firebase Auth** (email/contraseña o Google) y obtiene un *ID token* (JWT) que envía en la cabecera `Authorization: Bearer <token>`. El backend lo verifica contra las claves públicas de Firebase — **no necesita service account**, solo el ID del proyecto:
+
+```
+FIREBASE_PROJECT_ID=tu-proyecto-firebase
+```
+
+Defínela como variable de entorno (en Render: *Environment*). Sin ella, los endpoints protegidos devuelven 500; con un token inválido/ausente, 401.
+
+Los favoritos se guardan por usuario (UID de Firebase) en la tabla `favorites`.
 
 ## Sincronización automática con la web
 
@@ -101,6 +118,34 @@ FastAPI es fácil de publicar. Opciones:
 
 Cuando lo tengas en un dominio público con HTTPS, en la app pon
 `ApiConfig.Target = ApiTarget.Production` y ajusta la URL en `BaseUrl` (rama Production).
+
+## Producción en Render (recomendado)
+
+Ya desplegado en: `https://felco-motor-api.onrender.com`
+
+**Opción rápida (Blueprint):** el repo incluye `render.yaml`, que define el servicio web + Postgres + variables. En Render: *New → Blueprint*, conecta el repo y aplica. (Si tu repo ya es la carpeta `ferco-api-python`, borra la línea `rootDir` del `render.yaml`.) Si prefieres configurarlo a mano, sigue los pasos de abajo.
+
+**Comando de inicio** (Render → Settings → Start Command):
+```
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+**1. Base de datos persistente (Postgres).** Con SQLite, en Render el disco es efímero: la BD se borra en cada reinicio/despliegue (los coches creados/editados y los mensajes de contacto se pierden; solo se re-siembran los 205 de `inventory.json`). Para que persista:
+   - En Render crea un **PostgreSQL** (New → PostgreSQL, plan Free).
+   - Copia su *Internal Database URL* (empieza por `postgres://`).
+   - En el servicio web → *Environment* → añade la variable `DATABASE_URL` con esa URL.
+   - El código la normaliza solo (`postgres://` → `postgresql+psycopg://`). Redeploy y listo.
+
+**2. Variables de entorno útiles** (Environment):
+   - `DATABASE_URL` → Postgres (ver arriba).
+   - `SYNC_INTERVAL_HOURS` → cada cuántas horas sincroniza (por defecto 12; `0` desactiva).
+   - `SYNC_TOKEN` → si lo defines, `POST /v1/sync` exige la cabecera `X-Sync-Token`.
+
+**3. Evitar el "sueño" y sincronizar a diario (plan Free).** El plan gratuito duerme el servicio tras ~15 min inactivo (primera petición lenta) y el programador interno no corre dormido. Solución sencilla con un cron externo gratis (p. ej. **cron-job.org**):
+   - **Keep-alive**: un job que haga `GET https://felco-motor-api.onrender.com/health` cada 10-14 min → lo mantiene despierto.
+   - **Sync diaria**: un job que haga `POST https://felco-motor-api.onrender.com/v1/sync` una vez al día (si usas `SYNC_TOKEN`, añade la cabecera `X-Sync-Token`).
+
+   Con esto puedes incluso poner `SYNC_INTERVAL_HOURS=0` y dejar la sincronización solo al cron externo (más fiable en Free).
 
 ## Estructura
 
