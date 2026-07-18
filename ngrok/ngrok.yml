@@ -1,0 +1,8 @@
+version: "3"
+agent:
+    authtoken: 3DFgZdsy2A97dBZ6TppwpeRAZwP_2ShtyqWgNDLPJmF1BZSvt
+tunnels:
+  flask_app:
+    addr: localhost:5080
+    proto: http
+    domain: careless-swept-gleeful.ngrok-free.dev
