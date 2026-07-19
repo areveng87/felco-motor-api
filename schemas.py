@@ -1,5 +1,5 @@
 """Esquemas Pydantic (contrato JSON que consume la app)."""
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -21,6 +21,8 @@ class CarBase(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     images: List[str] = []
+    details: Dict[str, str] = {}
+    features: List[str] = []
 
 
 class CarIn(CarBase):

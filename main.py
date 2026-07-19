@@ -46,7 +46,7 @@ app.add_middleware(
 CAR_FIELDS = [
     "vin", "make", "model", "version", "year", "price", "mileage", "fuel",
     "transmission", "power", "doors", "color", "body", "location",
-    "description", "images",
+    "description", "images", "details", "features",
 ]
 
 

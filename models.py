@@ -29,6 +29,8 @@ class Car(Base):
     location = Column(String(120))
     description = Column(Text)
     images = Column(JSON, default=list)
+    details = Column(JSON, default=dict)                 # todas las specs de la ficha (clave->valor)
+    features = Column(JSON, default=list)                # equipamiento / opciones
     status = Column(String(20), default="available")    # available | sold
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -21,7 +21,7 @@ from database import Base, SessionLocal, engine
 UPDATABLE = [
     "make", "model", "version", "year", "price", "mileage", "fuel",
     "transmission", "power", "doors", "color", "body", "location",
-    "description", "images",
+    "description", "images", "details", "features",
 ]
 
 

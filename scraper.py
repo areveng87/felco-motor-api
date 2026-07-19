@@ -137,6 +137,20 @@ def parse_detail(html: str, url: str) -> Optional[dict]:
     version = " ".join(x for x in [trim, body_raw] if x).strip()
     fuel = _map_fuel(specs.get("Fuel Type", "") or specs.get("Fuel", ""))
 
+    # Equipamiento / opciones: <li> bajo una seccion "Features/Options/Equipment".
+    features = []
+    for hdr in soup.find_all(string=re.compile(r"(feature|option|equipment)", re.I)):
+        node = getattr(hdr, "parent", None)
+        lst = node.find_next(["ul", "ol"]) if node else None
+        if lst:
+            for li in lst.find_all("li"):
+                t = li.get_text(" ", strip=True)
+                if t and t not in features:
+                    features.append(t)
+        if features:
+            break
+    features = features[:80]
+
     return {
         "vin": vin,
         "make": make,
@@ -154,6 +168,9 @@ def parse_detail(html: str, url: str) -> Optional[dict]:
         "location": "Miami, FL",
         "description": f"{year} {make} {model} {version}. VIN {vin}. Ubicado en Miami, FL.".replace("  ", " "),
         "images": images,
+        "details": dict(specs),      # TODAS las especificaciones de la ficha
+        "features": features,
+        "source_url": url,
     }
 
 
