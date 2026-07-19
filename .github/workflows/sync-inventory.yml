@@ -9,7 +9,7 @@ name: Sincronizar inventario
 
 on:
   schedule:
-    - cron: "/15 * * * *"   # cada 6 horas (hora UTC). Ajusta a tu gusto.
+    - cron: "*/15 * * * *"   # cada 6 horas (hora UTC). Ajusta a tu gusto.
   workflow_dispatch:          # boton para lanzarlo manualmente desde la pestana Actions
 
 jobs:
