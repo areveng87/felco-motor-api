@@ -56,3 +56,8 @@ class NotifyIn(BaseModel):
     title: str
     body: str
     data: Optional[Dict[str, str]] = None
+    # Atajos de destino (se traducen a 'data' automaticamente):
+    #  - car_id: abre la ficha de ese coche
+    #  - route:  abre una seccion (catalog | favorites | contact | profile)
+    car_id: Optional[str] = None
+    route: Optional[str] = None

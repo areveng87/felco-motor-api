@@ -1,18 +1,31 @@
 # Envia una notificacion de prueba a TODOS los dispositivos registrados.
-# Uso:  powershell -ExecutionPolicy Bypass -File notificar.ps1
+#
+# Uso (elige uno):
+#   powershell -ExecutionPolicy Bypass -File notificar.ps1
+#   powershell -ExecutionPolicy Bypass -File notificar.ps1 -Destino coche  -CarId "ID_DEL_COCHE"
+#   powershell -ExecutionPolicy Bypass -File notificar.ps1 -Destino seccion -Route "favorites"
+#
 # Ajusta SYNC_TOKEN con el valor que tienes en Render (variable de entorno SYNC_TOKEN).
+
+param(
+    [ValidateSet("app", "coche", "seccion")]
+    [string]$Destino = "app",
+    [string]$CarId = "",
+    [string]$Route = "favorites",   # catalog | favorites | contact | profile
+    [string]$Titulo = "FercoMotors",
+    [string]$Mensaje = "Tienes una novedad en FercoMotors"
+)
 
 $BaseUrl   = "https://felco-motor-api.onrender.com"
 $SyncToken = "PON_AQUI_TU_SYNC_TOKEN"
 
-$Titulo  = "FercoMotors"
-$Mensaje = "Prueba de notificacion con la app cerrada"
-
-$body = @{
-    title = $Titulo
-    body  = $Mensaje
-    data  = @{ tipo = "test" }
-} | ConvertTo-Json
+$payload = @{ title = $Titulo; body = $Mensaje }
+switch ($Destino) {
+    "coche"   { $payload.car_id = $CarId }
+    "seccion" { $payload.route  = $Route }
+    default   { $payload.data   = @{ type = "app" } }
+}
+$body = $payload | ConvertTo-Json -Depth 5
 
 try {
     $resp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/notify" `

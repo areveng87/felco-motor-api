@@ -161,7 +161,7 @@
       }
     },
     {
-      "name": "Notificar a todos (X-Sync-Token)",
+      "name": "Notificar a todos (solo abre la app)",
       "request": {
         "method": "POST",
         "header": [
@@ -170,7 +170,33 @@
         ],
         "body": { "mode": "raw", "raw": "{\n  \"title\": \"Ofertas FercoMotors\",\n  \"body\": \"Nuevos coches disponibles esta semana\",\n  \"data\": { \"type\": \"promo\" }\n}" },
         "url": { "raw": "{{baseUrl}}/v1/notify", "host": ["{{baseUrl}}"], "path": ["v1", "notify"] },
-        "description": "Envia una notificacion push a todos los dispositivos registrados. Requiere el SYNC_TOKEN en la variable syncToken."
+        "description": "Notificacion generica: al tocarla solo abre la app. Requiere el SYNC_TOKEN en la variable syncToken."
+      }
+    },
+    {
+      "name": "Notificar -> abre un COCHE (car_id)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Sync-Token", "value": "{{syncToken}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"¡Nuevo Toyota Camry!\",\n  \"body\": \"Toca para ver la ficha del coche\",\n  \"car_id\": \"{{carId}}\"\n}" },
+        "url": { "raw": "{{baseUrl}}/v1/notify", "host": ["{{baseUrl}}"], "path": ["v1", "notify"] },
+        "description": "Al tocar la notificacion abre la ficha del coche cuyo id esta en car_id (usa la variable carId, o pega un id concreto)."
+      }
+    },
+    {
+      "name": "Notificar -> abre una SECCION (route)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Sync-Token", "value": "{{syncToken}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Tus favoritos\",\n  \"body\": \"Mira tus coches guardados\",\n  \"route\": \"favorites\"\n}" },
+        "url": { "raw": "{{baseUrl}}/v1/notify", "host": ["{{baseUrl}}"], "path": ["v1", "notify"] },
+        "description": "Al tocar la notificacion abre una seccion. route admite: catalog | favorites | contact | profile."
       }
     },
     {

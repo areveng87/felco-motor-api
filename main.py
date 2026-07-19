@@ -281,7 +281,17 @@ def notify(payload: schemas.NotifyIn, x_sync_token: Optional[str] = Header(None)
     """Envia una notificacion manual a todos los dispositivos. Protegido con SYNC_TOKEN."""
     if SYNC_TOKEN and x_sync_token != SYNC_TOKEN:
         raise HTTPException(status_code=401, detail="Token invalido")
-    return _notify_all(db, payload.title, payload.body, payload.data)
+
+    # Construir el 'data' final a partir de los atajos de destino.
+    data = dict(payload.data or {})
+    if payload.car_id:
+        data.setdefault("type", "car")
+        data["carId"] = payload.car_id
+    elif payload.route:
+        data.setdefault("type", "section")
+        data["route"] = payload.route
+
+    return _notify_all(db, payload.title, payload.body, data)
 
 
 @app.post("/v1/contact", status_code=status.HTTP_202_ACCEPTED)
