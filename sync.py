@@ -3,7 +3,7 @@ Sincronizacion del inventario con fercomotors.com.
 
 - Coches nuevos (VIN que no existe) -> se crean.
 - Coches existentes (mismo VIN)      -> se actualizan (precio, km, etc.).
-- Coches que ya no aparecen en la web -> se marcan como "sold".
+- Coches que ya no aparecen en la web -> se BORRAN (con sus favoritos).
 
 Uso por linea de comandos (one-off / cron):
     python sync.py            # sincroniza todo el inventario
@@ -48,15 +48,21 @@ def sync_inventory(db: Session, cars: List[dict]) -> dict:
                               **{k: c.get(k) for k in UPDATABLE if c.get(k) is not None}))
             created += 1
 
-    # Marcar como vendidos los que estaban disponibles y ya no aparecen
-    sold = 0
-    for car in db.query(models.Car).filter(models.Car.status == "available").all():
-        if (car.vin or "").upper() not in seen:
-            car.status = "sold"
-            sold += 1
+    # Limpieza: borrar los coches que ya no aparecen en el inventario web
+    # (junto con sus favoritos). Guardado: solo si el scrape trajo inventario,
+    # para no vaciar la BD si la web fallo y devolvio 0 coches.
+    removed = 0
+    if seen:
+        for car in db.query(models.Car).all():
+            if (car.vin or "").upper() not in seen:
+                db.query(models.Favorite).filter(
+                    models.Favorite.car_id == car.id
+                ).delete(synchronize_session=False)
+                db.delete(car)
+                removed += 1
 
     db.commit()
-    return {"created": created, "updated": updated, "sold": sold, "seen": len(seen)}
+    return {"created": created, "updated": updated, "removed": removed, "seen": len(seen)}
 
 
 def run(max_pages: Optional[int] = None, max_cars: Optional[int] = None) -> dict:

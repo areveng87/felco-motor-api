@@ -126,7 +126,8 @@ def list_cars(
     sort: Optional[str] = Query(None, description="priceAsc | priceDesc | make"),
     db: Session = Depends(get_db),
 ):
-    query = db.query(models.Car)
+    # Solo inventario activo (nunca coches ya retirados/vendidos).
+    query = db.query(models.Car).filter(models.Car.status != "sold")
 
     if q:
         like = f"%{q}%"

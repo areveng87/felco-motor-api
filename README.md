@@ -69,7 +69,7 @@ El backend puede mantenerse al día solo con fercomotors.com. La sincronización
 
 - Coche nuevo (VIN no visto) → se **crea**.
 - Coche existente (mismo VIN) → se **actualiza** (precio, km, etc.).
-- Coche que ya no aparece en la web → se marca como **`sold`** (no se borra).
+- Coche que ya no aparece en la web → se **borra** (junto con sus favoritos).
 
 Formas de lanzarla:
 
@@ -78,7 +78,7 @@ Formas de lanzarla:
    curl -X POST "http://localhost:5080/v1/sync?maxPages=1"
    curl -X POST "http://localhost:5080/v1/sync"          # inventario completo (1-2 min)
    ```
-   Devuelve p.ej. `{"created":3,"updated":200,"sold":2,"seen":205,"scraped":205}`.
+   Devuelve p.ej. `{"created":3,"updated":200,"removed":2,"seen":205,"scraped":205}`.
 
 2. **Programada** (automática): se ejecuta cada `SYNC_INTERVAL_HOURS` horas (por defecto **12**). Para cambiarla o desactivarla, define la variable de entorno antes de arrancar:
    ```
