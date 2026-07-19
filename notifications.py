@@ -52,6 +52,26 @@ def send_to_tokens(tokens, title: str, body: str, data: dict | None = None) -> d
     message = messaging.MulticastMessage(
         notification=messaging.Notification(title=title, body=body),
         data={k: str(v) for k, v in (data or {}).items()},
+        # Prioridad alta + canal: necesario para que llegue con la app cerrada/Doze.
+        android=messaging.AndroidConfig(
+            priority="high",
+            notification=messaging.AndroidNotification(
+                title=title,
+                body=body,
+                channel_id="fercomotors_default",
+                default_sound=True,
+            ),
+        ),
+        apns=messaging.APNSConfig(
+            headers={"apns-priority": "10"},
+            payload=messaging.APNSPayload(
+                aps=messaging.Aps(
+                    alert=messaging.ApsAlert(title=title, body=body),
+                    sound="default",
+                    content_available=True,
+                ),
+            ),
+        ),
         tokens=tokens,
     )
 
