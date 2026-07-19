@@ -19,6 +19,7 @@ from typing import List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 import models
@@ -31,7 +32,28 @@ from database import Base, SessionLocal, engine
 SYNC_TOKEN = os.getenv("SYNC_TOKEN", "")               # si se define, protege POST /v1/sync
 SYNC_INTERVAL_HOURS = int(os.getenv("SYNC_INTERVAL_HOURS", "12"))  # 0 = desactivado
 
+
+def _ensure_columns():
+    """Auto-migracion ligera: añade columnas nuevas a 'cars' si faltan (SQLite/Postgres)."""
+    insp = inspect(engine)
+    if "cars" not in insp.get_table_names():
+        return
+    existing = {c["name"] for c in insp.get_columns("cars")}
+    faltan = []
+    if "details" not in existing:
+        faltan.append(("details", "'{}'"))
+    if "features" not in existing:
+        faltan.append(("features", "'[]'"))
+    if not faltan:
+        return
+    with engine.begin() as conn:
+        for name, default in faltan:
+            conn.execute(text(f"ALTER TABLE cars ADD COLUMN {name} JSON"))
+            conn.execute(text(f"UPDATE cars SET {name} = {default} WHERE {name} IS NULL"))
+
+
 Base.metadata.create_all(bind=engine)
+_ensure_columns()
 
 app = FastAPI(title="FercoMotors API", version="1.0")
 
