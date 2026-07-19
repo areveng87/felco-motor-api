@@ -47,6 +47,17 @@ class Favorite(Base):
     __table_args__ = (UniqueConstraint("user_uid", "car_id", name="uq_fav_user_car"),)
 
 
+class Device(Base):
+    __tablename__ = "devices"
+
+    id = Column(String(32), primary_key=True, default=new_id)
+    user_uid = Column(String(128), index=True, nullable=False)   # UID de Firebase
+    token = Column(String(400), unique=True, nullable=False)     # token FCM del dispositivo
+    platform = Column(String(20), default="android")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ContactMessage(Base):
     __tablename__ = "contact_messages"
 

@@ -45,3 +45,14 @@ class ContactIn(BaseModel):
     email: str
     phone: Optional[str] = None
     message: str
+
+
+class DeviceIn(BaseModel):
+    token: str
+    platform: Optional[str] = "android"
+
+
+class NotifyIn(BaseModel):
+    title: str
+    body: str
+    data: Optional[Dict[str, str]] = None

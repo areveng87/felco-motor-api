@@ -23,6 +23,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 import models
+import notifications
 import schemas
 import sync as sync_module
 from auth import get_current_user
@@ -231,6 +232,51 @@ def remove_favorite(car_id: str, user=Depends(get_current_user), db: Session = D
         db.commit()
 
 
+@app.post("/v1/devices", status_code=status.HTTP_201_CREATED)
+def register_device(payload: schemas.DeviceIn, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Registra (o actualiza) el token FCM del dispositivo del usuario autenticado."""
+    dev = db.query(models.Device).filter_by(token=payload.token).first()
+    if dev is None:
+        dev = models.Device(user_uid=user["uid"], token=payload.token, platform=payload.platform or "android")
+        db.add(dev)
+    else:
+        dev.user_uid = user["uid"]
+        dev.platform = payload.platform or dev.platform
+    db.commit()
+    return {"status": "ok"}
+
+
+@app.delete("/v1/devices/{token}", status_code=status.HTTP_204_NO_CONTENT)
+def unregister_device(token: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Quita el token del dispositivo (p. ej. al cerrar sesion)."""
+    dev = db.query(models.Device).filter_by(token=token).first()
+    if dev is not None:
+        db.delete(dev)
+        db.commit()
+
+
+def _notify_all(db: Session, title: str, body: str, data: dict | None = None) -> dict:
+    """Envia una notificacion a todos los dispositivos registrados y limpia los invalidos."""
+    tokens = [d.token for d in db.query(models.Device).all()]
+    result = notifications.send_to_tokens(tokens, title, body, data)
+    for bad in result.get("invalid", []):
+        d = db.query(models.Device).filter_by(token=bad).first()
+        if d:
+            db.delete(d)
+    if result.get("invalid"):
+        db.commit()
+    return result
+
+
+@app.post("/v1/notify")
+def notify(payload: schemas.NotifyIn, x_sync_token: Optional[str] = Header(None),
+           db: Session = Depends(get_db)):
+    """Envia una notificacion manual a todos los dispositivos. Protegido con SYNC_TOKEN."""
+    if SYNC_TOKEN and x_sync_token != SYNC_TOKEN:
+        raise HTTPException(status_code=401, detail="Token invalido")
+    return _notify_all(db, payload.title, payload.body, payload.data)
+
+
 @app.post("/v1/contact", status_code=status.HTTP_202_ACCEPTED)
 def send_contact(payload: schemas.ContactIn, db: Session = Depends(get_db)):
     msg = models.ContactMessage(
@@ -260,6 +306,20 @@ def trigger_sync(
     if SYNC_TOKEN and x_sync_token != SYNC_TOKEN:
         raise HTTPException(status_code=401, detail="Token de sincronizacion invalido")
     stats = sync_module.run(max_pages=maxPages, max_cars=maxCars)
+
+    # Aviso automatico si hay coches nuevos.
+    if stats.get("created", 0) > 0:
+        db = SessionLocal()
+        try:
+            n = stats["created"]
+            stats["notified"] = _notify_all(
+                db,
+                "Nuevos coches en FercoMotors",
+                f"{n} coche{'s' if n != 1 else ''} nuevo{'s' if n != 1 else ''} disponible{'s' if n != 1 else ''}.",
+                {"type": "new_cars"},
+            )
+        finally:
+            db.close()
     return stats
 
 
@@ -281,7 +341,17 @@ def start_scheduler():
 
     def job():
         try:
-            print("Sync automatica:", sync_module.run())
+            stats = sync_module.run()
+            print("Sync automatica:", stats)
+            if stats.get("created", 0) > 0:
+                db = SessionLocal()
+                try:
+                    n = stats["created"]
+                    _notify_all(db, "Nuevos coches en FercoMotors",
+                                f"{n} coche{'s' if n != 1 else ''} nuevo{'s' if n != 1 else ''} disponible{'s' if n != 1 else ''}.",
+                                {"type": "new_cars"})
+                finally:
+                    db.close()
         except Exception as e:  # noqa: BLE001
             print("Error en sync automatica:", e)
 
