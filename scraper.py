@@ -128,6 +128,14 @@ def parse_detail(html: str, url: str) -> Optional[dict]:
         if pm.group(1) and not pm.group(2):
             price = max(price, float(pm.group(1).replace(",", "")))
 
+    # Cuota de financiacion ("$157.95/mo"). Primero por su div, luego por texto.
+    monthly_payment = 0.0
+    mp_el = soup.select_one(".monthly-payment, .monthly-payment-mobile")
+    mp_src = mp_el.get_text(" ", strip=True) if mp_el else text
+    mp = re.search(r"\$\s*([0-9][\d,]*(?:\.\d+)?)\s*/\s*mo", mp_src, re.I)
+    if mp:
+        monthly_payment = float(mp.group(1).replace(",", ""))
+
     images = []
     for im in IMG_RE.finditer(html):
         if im.group(0) not in images:
@@ -169,6 +177,7 @@ def parse_detail(html: str, url: str) -> Optional[dict]:
         "version": version,
         "year": year,
         "price": price,
+        "monthly_payment": monthly_payment,
         "mileage": mileage,
         "fuel": fuel,
         "transmission": _map_transmission(specs.get("Transmission", "")),

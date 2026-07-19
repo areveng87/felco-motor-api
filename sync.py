@@ -19,7 +19,7 @@ from database import Base, SessionLocal, engine
 
 # Campos que se actualizan de un coche existente (no tocamos id/created_at)
 UPDATABLE = [
-    "make", "model", "version", "year", "price", "mileage", "fuel",
+    "make", "model", "version", "year", "price", "monthly_payment", "mileage", "fuel",
     "transmission", "power", "doors", "color", "body", "location",
     "description", "images", "details", "features",
 ]

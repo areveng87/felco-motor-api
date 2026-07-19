@@ -19,6 +19,7 @@ class Car(Base):
     version = Column(String(200))
     year = Column(Integer, nullable=False)
     price = Column(Float, default=0)
+    monthly_payment = Column(Float, default=0)          # cuota de financiacion ($/mes), 0 si no tiene
     mileage = Column(Integer, default=0)
     fuel = Column(String(40), default="")
     transmission = Column(String(40), default="")

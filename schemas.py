@@ -11,6 +11,7 @@ class CarBase(BaseModel):
     version: Optional[str] = None
     year: int
     price: float = 0
+    monthly_payment: float = 0
     mileage: int = 0
     fuel: str = ""
     transmission: str = ""

@@ -15,6 +15,7 @@ Docs interactivas:  http://localhost:5080/docs
 """
 import json
 import os
+import threading
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
@@ -40,16 +41,19 @@ def _ensure_columns():
     if "cars" not in insp.get_table_names():
         return
     existing = {c["name"] for c in insp.get_columns("cars")}
+    # (nombre, tipo SQL, valor por defecto para rellenar los NULL)
     faltan = []
     if "details" not in existing:
-        faltan.append(("details", "'{}'"))
+        faltan.append(("details", "JSON", "'{}'"))
     if "features" not in existing:
-        faltan.append(("features", "'[]'"))
+        faltan.append(("features", "JSON", "'[]'"))
+    if "monthly_payment" not in existing:
+        faltan.append(("monthly_payment", "FLOAT", "0"))
     if not faltan:
         return
     with engine.begin() as conn:
-        for name, default in faltan:
-            conn.execute(text(f"ALTER TABLE cars ADD COLUMN {name} JSON"))
+        for name, sql_type, default in faltan:
+            conn.execute(text(f"ALTER TABLE cars ADD COLUMN {name} {sql_type}"))
             conn.execute(text(f"UPDATE cars SET {name} = {default} WHERE {name} IS NULL"))
 
 
@@ -67,7 +71,7 @@ app.add_middleware(
 )
 
 CAR_FIELDS = [
-    "vin", "make", "model", "version", "year", "price", "mileage", "fuel",
+    "vin", "make", "model", "version", "year", "price", "monthly_payment", "mileage", "fuel",
     "transmission", "power", "doors", "color", "body", "location",
     "description", "images", "details", "features",
 ]
@@ -310,35 +314,53 @@ def send_contact(payload: schemas.ContactIn, db: Session = Depends(get_db)):
     return {"id": msg.id}
 
 
-@app.post("/v1/sync")
+_sync_running = False   # evita solapar sincronizaciones
+
+
+def _run_sync_job(max_pages, max_cars):
+    """Ejecuta la sincronizacion (bloqueante) y avisa si hay coches nuevos."""
+    global _sync_running
+    try:
+        stats = sync_module.run(max_pages=max_pages, max_cars=max_cars)
+        print("Sync terminado:", stats)
+        if stats.get("created", 0) > 0:
+            db = SessionLocal()
+            try:
+                n = stats["created"]
+                _notify_all(
+                    db,
+                    "Nuevos coches en FercoMotors",
+                    f"{n} coche{'s' if n != 1 else ''} nuevo{'s' if n != 1 else ''} disponible{'s' if n != 1 else ''}.",
+                    {"type": "new_cars"},
+                )
+            finally:
+                db.close()
+    except Exception as e:  # noqa: BLE001
+        print("Error en la sincronizacion:", e)
+    finally:
+        _sync_running = False
+
+
+@app.post("/v1/sync", status_code=status.HTTP_202_ACCEPTED)
 def trigger_sync(
     maxPages: Optional[int] = Query(None, description="Limitar nº de páginas (para probar; p.ej. 1)"),
     maxCars: Optional[int] = Query(None, description="Limitar nº de coches (para probar)"),
     x_sync_token: Optional[str] = Header(None),
 ):
     """
-    Lanza la sincronizacion con la web (upsert por VIN, marca vendidos).
-    Es sincrono: con el inventario completo puede tardar 1-2 minutos.
-    Para probar rapido usa ?maxPages=1 o ?maxCars=5.
+    Lanza la sincronizacion con la web EN SEGUNDO PLANO y responde al instante
+    (asi el proxy de Render no corta la peticion por tardar 1-2 min).
+    Devuelve {"status":"started"} o {"status":"already_running"}.
     """
     if SYNC_TOKEN and x_sync_token != SYNC_TOKEN:
         raise HTTPException(status_code=401, detail="Token de sincronizacion invalido")
-    stats = sync_module.run(max_pages=maxPages, max_cars=maxCars)
 
-    # Aviso automatico si hay coches nuevos.
-    if stats.get("created", 0) > 0:
-        db = SessionLocal()
-        try:
-            n = stats["created"]
-            stats["notified"] = _notify_all(
-                db,
-                "Nuevos coches en FercoMotors",
-                f"{n} coche{'s' if n != 1 else ''} nuevo{'s' if n != 1 else ''} disponible{'s' if n != 1 else ''}.",
-                {"type": "new_cars"},
-            )
-        finally:
-            db.close()
-    return stats
+    global _sync_running
+    if _sync_running:
+        return {"status": "already_running"}
+    _sync_running = True
+    threading.Thread(target=_run_sync_job, args=(maxPages, maxCars), daemon=True).start()
+    return {"status": "started"}
 
 
 # ---- Programador: sincroniza cada SYNC_INTERVAL_HOURS horas ----
