@@ -1,24 +1,52 @@
 {
   "info": {
-    "_postman_id": "f37c0a10-4b6e-4c2a-9f1e-fercomotors0001",
+    "_postman_id": "f37c0a10-4b6e-4c2a-9f1e-fercomotors0002",
     "name": "FercoMotors API",
-    "description": "API REST de FercoMotors (coches, contacto y sincronizacion). baseUrl por defecto: http://localhost:5080",
+    "description": "API REST de FercoMotors: coches, contacto, favoritos, usuarios, dispositivos, notificaciones y sync.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:5080", "type": "string" },
-    { "key": "carId", "value": "", "type": "string" }
+    { "key": "baseUrl", "value": "https://felco-motor-api.onrender.com", "type": "string" },
+    { "key": "carId", "value": "", "type": "string" },
+    { "key": "idToken", "value": "", "type": "string" },
+    { "key": "syncToken", "value": "", "type": "string" },
+    { "key": "fcmToken", "value": "", "type": "string" },
+    { "key": "firebaseApiKey", "value": "AIzaSyDytYISRFG03PnwK5t3pZvlYNLupYEFVrk", "type": "string" },
+    { "key": "email", "value": "", "type": "string" },
+    { "key": "password", "value": "", "type": "string" }
   ],
   "item": [
     {
+      "name": "0. Login Firebase (obtener idToken)",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "if (pm.response.code === 200) {",
+          "  pm.collectionVariables.set('idToken', pm.response.json().idToken);",
+          "  console.log('idToken guardado');",
+          "}"
+        ] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"returnSecureToken\": true\n}" },
+        "url": {
+          "raw": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{firebaseApiKey}}",
+          "protocol": "https",
+          "host": ["identitytoolkit", "googleapis", "com"],
+          "path": ["v1", "accounts:signInWithPassword"],
+          "query": [{ "key": "key", "value": "{{firebaseApiKey}}" }]
+        },
+        "description": "Inicia sesion en Firebase con email/contrasena y guarda el idToken en la variable de la coleccion (para los endpoints protegidos). Rellena antes las variables email y password."
+      }
+    },
+    {
       "name": "Listar coches",
       "request": {
-        "method": "GET",
-        "header": [],
+        "method": "GET", "header": [],
         "url": {
           "raw": "{{baseUrl}}/v1/cars?sort=priceDesc",
-          "host": ["{{baseUrl}}"],
-          "path": ["v1", "cars"],
+          "host": ["{{baseUrl}}"], "path": ["v1", "cars"],
           "query": [
             { "key": "q", "value": "toyota", "disabled": true },
             { "key": "fuel", "value": "Gasolina", "disabled": true },
@@ -29,132 +57,144 @@
             { "key": "sort", "value": "priceDesc", "description": "priceAsc | priceDesc | make" }
           ]
         },
-        "description": "Lista el inventario. Filtros opcionales (activa/desactiva los query params)."
+        "description": "Lista el inventario. Filtros opcionales."
       }
     },
     {
       "name": "Obtener coche por id",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/v1/cars/{{carId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["v1", "cars", "{{carId}}"]
-        },
-        "description": "Usa la variable carId (se rellena sola al crear un coche)."
-      }
+      "request": { "method": "GET", "header": [],
+        "url": { "raw": "{{baseUrl}}/v1/cars/{{carId}}", "host": ["{{baseUrl}}"], "path": ["v1", "cars", "{{carId}}"] },
+        "description": "Devuelve un coche (incluye details y features tras la sync)." }
     },
     {
       "name": "Crear coche",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "if (pm.response.code === 201) {",
-              "  var j = pm.response.json();",
-              "  pm.collectionVariables.set('carId', j.id);",
-              "}"
-            ]
-          }
-        }
-      ],
+      "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "if (pm.response.code === 201) { pm.collectionVariables.set('carId', pm.response.json().id); }"
+      ] } } ],
       "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla\",\n  \"version\": \"LE 4D Sedan\",\n  \"year\": 2021,\n  \"price\": 15999,\n  \"mileage\": 42000,\n  \"fuel\": \"Gasolina\",\n  \"transmission\": \"Automatico\",\n  \"power\": 0,\n  \"doors\": 4,\n  \"color\": \"Blanco\",\n  \"body\": \"Sedan\",\n  \"location\": \"Miami, FL\",\n  \"description\": \"Creado desde Postman\",\n  \"images\": [\"https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=1200\"]\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/v1/cars",
-          "host": ["{{baseUrl}}"],
-          "path": ["v1", "cars"]
-        },
-        "description": "Crea un coche. Guarda el id devuelto en carId."
+        "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla\",\n  \"version\": \"LE 4D Sedan\",\n  \"year\": 2021,\n  \"price\": 15999,\n  \"mileage\": 42000,\n  \"fuel\": \"Gasolina\",\n  \"transmission\": \"Automatico\",\n  \"power\": 0,\n  \"doors\": 4,\n  \"color\": \"Blanco\",\n  \"body\": \"Sedan\",\n  \"location\": \"Miami, FL\",\n  \"description\": \"Creado desde Postman\",\n  \"images\": [\"https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=1200\"]\n}" },
+        "url": { "raw": "{{baseUrl}}/v1/cars", "host": ["{{baseUrl}}"], "path": ["v1", "cars"] },
+        "description": "Crea un coche y guarda su id en carId."
       }
     },
     {
       "name": "Actualizar coche",
       "request": {
-        "method": "PUT",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla\",\n  \"version\": \"SE 4D Sedan\",\n  \"year\": 2021,\n  \"price\": 14499,\n  \"mileage\": 43500,\n  \"fuel\": \"Gasolina\",\n  \"transmission\": \"Automatico\",\n  \"power\": 0,\n  \"doors\": 4,\n  \"color\": \"Gris\",\n  \"body\": \"Sedan\",\n  \"location\": \"Miami, FL\",\n  \"description\": \"Actualizado desde Postman\",\n  \"images\": [\"https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=1200\"]\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/v1/cars/{{carId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["v1", "cars", "{{carId}}"]
-        },
+        "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla\",\n  \"version\": \"SE 4D Sedan\",\n  \"year\": 2021,\n  \"price\": 14499,\n  \"mileage\": 43500,\n  \"fuel\": \"Gasolina\",\n  \"transmission\": \"Automatico\",\n  \"power\": 0,\n  \"doors\": 4,\n  \"color\": \"Gris\",\n  \"body\": \"Sedan\",\n  \"location\": \"Miami, FL\",\n  \"description\": \"Actualizado desde Postman\",\n  \"images\": [\"https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=1200\"]\n}" },
+        "url": { "raw": "{{baseUrl}}/v1/cars/{{carId}}", "host": ["{{baseUrl}}"], "path": ["v1", "cars", "{{carId}}"] },
         "description": "Actualiza el coche cuyo id esta en carId."
       }
     },
     {
       "name": "Eliminar coche",
-      "request": {
-        "method": "DELETE",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/v1/cars/{{carId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["v1", "cars", "{{carId}}"]
-        },
-        "description": "Elimina el coche cuyo id esta en carId. Devuelve 204."
-      }
+      "request": { "method": "DELETE", "header": [],
+        "url": { "raw": "{{baseUrl}}/v1/cars/{{carId}}", "host": ["{{baseUrl}}"], "path": ["v1", "cars", "{{carId}}"] },
+        "description": "Elimina el coche. 204." }
     },
     {
       "name": "Enviar contacto",
       "request": {
+        "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"carTitle\": \"Toyota Corolla\",\n  \"name\": \"Ana Revilla\",\n  \"email\": \"ana@example.com\",\n  \"phone\": \"600123123\",\n  \"message\": \"Interesada, sigue disponible?\"\n}" },
+        "url": { "raw": "{{baseUrl}}/v1/contact", "host": ["{{baseUrl}}"], "path": ["v1", "contact"] },
+        "description": "Registra una solicitud de contacto. 202."
+      }
+    },
+    {
+      "name": "Mi usuario (auth)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
+        "url": { "raw": "{{baseUrl}}/v1/me", "host": ["{{baseUrl}}"], "path": ["v1", "me"] },
+        "description": "Devuelve el usuario autenticado. Requiere idToken (ejecuta antes 'Login Firebase')."
+      }
+    },
+    {
+      "name": "Listar favoritos (auth)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
+        "url": { "raw": "{{baseUrl}}/v1/favorites", "host": ["{{baseUrl}}"], "path": ["v1", "favorites"] },
+        "description": "Coches favoritos del usuario."
+      }
+    },
+    {
+      "name": "Anadir favorito (auth)",
+      "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"carTitle\": \"Toyota Corolla\",\n  \"name\": \"Ana Revilla\",\n  \"email\": \"ana@example.com\",\n  \"phone\": \"600123123\",\n  \"message\": \"Interesada en este coche, sigue disponible?\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/v1/contact",
-          "host": ["{{baseUrl}}"],
-          "path": ["v1", "contact"]
-        },
-        "description": "Registra una solicitud de contacto. Devuelve 202."
+        "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
+        "url": { "raw": "{{baseUrl}}/v1/favorites/{{carId}}", "host": ["{{baseUrl}}"], "path": ["v1", "favorites", "{{carId}}"] },
+        "description": "Marca un coche como favorito. 201."
+      }
+    },
+    {
+      "name": "Quitar favorito (auth)",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
+        "url": { "raw": "{{baseUrl}}/v1/favorites/{{carId}}", "host": ["{{baseUrl}}"], "path": ["v1", "favorites", "{{carId}}"] },
+        "description": "Quita el coche de favoritos. 204."
+      }
+    },
+    {
+      "name": "Registrar dispositivo (auth)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{idToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{fcmToken}}\",\n  \"platform\": \"android\"\n}" },
+        "url": { "raw": "{{baseUrl}}/v1/devices", "host": ["{{baseUrl}}"], "path": ["v1", "devices"] },
+        "description": "Registra el token FCM del dispositivo para el usuario. La app lo hace sola al iniciar sesion."
+      }
+    },
+    {
+      "name": "Baja dispositivo (auth)",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
+        "url": { "raw": "{{baseUrl}}/v1/devices/{{fcmToken}}", "host": ["{{baseUrl}}"], "path": ["v1", "devices", "{{fcmToken}}"] },
+        "description": "Da de baja el token del dispositivo. 204."
+      }
+    },
+    {
+      "name": "Notificar a todos (X-Sync-Token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Sync-Token", "value": "{{syncToken}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Ofertas FercoMotors\",\n  \"body\": \"Nuevos coches disponibles esta semana\",\n  \"data\": { \"type\": \"promo\" }\n}" },
+        "url": { "raw": "{{baseUrl}}/v1/notify", "host": ["{{baseUrl}}"], "path": ["v1", "notify"] },
+        "description": "Envia una notificacion push a todos los dispositivos registrados. Requiere el SYNC_TOKEN en la variable syncToken."
       }
     },
     {
       "name": "Sincronizar inventario (prueba: 1 pagina)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "X-Sync-Token", "value": "", "description": "Solo si definiste SYNC_TOKEN", "disabled": true }
-        ],
+        "header": [{ "key": "X-Sync-Token", "value": "{{syncToken}}", "disabled": true }],
         "url": {
-          "raw": "{{baseUrl}}/v1/sync?maxPages=1",
-          "host": ["{{baseUrl}}"],
-          "path": ["v1", "sync"],
+          "raw": "{{baseUrl}}/v1/sync?maxPages=1", "host": ["{{baseUrl}}"], "path": ["v1", "sync"],
           "query": [
-            { "key": "maxPages", "value": "1", "description": "Paginas a scrapear (quitar para todo)" },
+            { "key": "maxPages", "value": "1", "description": "Paginas (quitar para todo)" },
             { "key": "maxCars", "value": "5", "description": "Limite de coches", "disabled": true }
           ]
         },
-        "description": "Sincroniza con fercomotors.com (upsert por VIN). maxPages=1 para probar rapido."
+        "description": "Sincroniza con fercomotors.com. maxPages=1 para probar."
       }
     },
     {
       "name": "Sincronizar inventario (completo)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "X-Sync-Token", "value": "", "description": "Solo si definiste SYNC_TOKEN", "disabled": true }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/v1/sync",
-          "host": ["{{baseUrl}}"],
-          "path": ["v1", "sync"]
-        },
-        "description": "Sincroniza TODO el inventario. Tarda 1-2 minutos."
+        "header": [{ "key": "X-Sync-Token", "value": "{{syncToken}}", "disabled": true }],
+        "url": { "raw": "{{baseUrl}}/v1/sync", "host": ["{{baseUrl}}"], "path": ["v1", "sync"] },
+        "description": "Sincroniza TODO el inventario (rellena details/features). 1-2 min."
       }
     }
   ]

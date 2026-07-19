@@ -232,6 +232,13 @@ def remove_favorite(car_id: str, user=Depends(get_current_user), db: Session = D
         db.commit()
 
 
+@app.get("/v1/devices")
+def list_devices(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Lista los dispositivos (tokens) registrados por el usuario. Util para verificar."""
+    devs = db.query(models.Device).filter_by(user_uid=user["uid"]).all()
+    return [{"token": d.token[:24] + "…", "platform": d.platform, "created_at": str(d.created_at)} for d in devs]
+
+
 @app.post("/v1/devices", status_code=status.HTTP_201_CREATED)
 def register_device(payload: schemas.DeviceIn, user=Depends(get_current_user), db: Session = Depends(get_db)):
     """Registra (o actualiza) el token FCM del dispositivo del usuario autenticado."""

@@ -62,10 +62,13 @@ def send_to_tokens(tokens, title: str, body: str, data: dict | None = None) -> d
         resp = messaging.send_multicast(message)
 
     invalid = []
+    bad_markers = ("not-registered", "invalid-argument", "invalid-registration",
+                   "unregistered", "not_found", "registration-token")
     for i, r in enumerate(resp.responses):
         if not r.success:
-            err = str(getattr(r, "exception", ""))
-            if "not-registered" in err.lower() or "invalid-argument" in err.lower():
+            exc = getattr(r, "exception", None)
+            code = (getattr(exc, "code", "") or str(exc) or "").lower()
+            if any(x in code for x in bad_markers):
                 invalid.append(tokens[i])
 
     return {"sent": resp.success_count, "failed": resp.failure_count, "invalid": invalid}
