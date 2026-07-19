@@ -1,0 +1,36 @@
+name: Sincronizar inventario
+
+# Sincroniza el inventario de FercoMotors llamando al endpoint /v1/sync de la API
+# en Render. Se ejecuta en un horario (cron) y tambien se puede lanzar a mano.
+#
+# REQUISITO: crea un secret del repositorio llamado SYNC_TOKEN con el mismo
+# valor que la variable de entorno SYNC_TOKEN del servicio en Render.
+#   GitHub -> Settings -> Secrets and variables -> Actions -> New repository secret
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # cada 6 horas (hora UTC). Ajusta a tu gusto.
+  workflow_dispatch:          # boton para lanzarlo manualmente desde la pestana Actions
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST /v1/sync
+        env:
+          BASE_URL: https://felco-motor-api.onrender.com
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          echo "Lanzando sincronizacion (la API Free puede tardar en despertar)..."
+          code=$(curl -s -o /tmp/resp.json -w "%{http_code}" -X POST \
+            "$BASE_URL/v1/sync" \
+            -H "X-Sync-Token: $SYNC_TOKEN" \
+            --max-time 600)
+          echo "HTTP $code"
+          echo "Respuesta:"
+          cat /tmp/resp.json || true
+          echo ""
+          if [ "$code" != "200" ]; then
+            echo "::error::La sincronizacion fallo (HTTP $code)"
+            exit 1
+          fi
