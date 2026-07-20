@@ -30,7 +30,9 @@ jobs:
           echo "Respuesta:"
           cat /tmp/resp.json || true
           echo ""
-          if [ "$code" != "200" ]; then
-            echo "::error::La sincronizacion fallo (HTTP $code)"
+          # La sincronizacion se lanza en segundo plano: la API responde 202 (o 200).
+          if [ "${code#2}" = "$code" ]; then
+            echo "::error::La sincronizacion no se pudo lanzar (HTTP $code)"
             exit 1
           fi
+          echo "Sincronizacion lanzada correctamente."
