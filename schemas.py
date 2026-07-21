@@ -21,9 +21,11 @@ class CarBase(BaseModel):
     body: Optional[str] = None
     location: Optional[str] = None
     description: Optional[str] = None
+    description_es: Optional[str] = None
     images: List[str] = []
     details: Dict[str, str] = {}
     features: List[str] = []
+    features_es: List[str] = []
 
 
 class CarIn(CarBase):

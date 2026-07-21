@@ -49,6 +49,10 @@ def _ensure_columns():
         faltan.append(("features", "JSON", "'[]'"))
     if "monthly_payment" not in existing:
         faltan.append(("monthly_payment", "FLOAT", "0"))
+    if "description_es" not in existing:
+        faltan.append(("description_es", "TEXT", "''"))
+    if "features_es" not in existing:
+        faltan.append(("features_es", "JSON", "'[]'"))
     if not faltan:
         return
     with engine.begin() as conn:
@@ -73,7 +77,7 @@ app.add_middleware(
 CAR_FIELDS = [
     "vin", "make", "model", "version", "year", "price", "monthly_payment", "mileage", "fuel",
     "transmission", "power", "doors", "color", "body", "location",
-    "description", "images", "details", "features",
+    "description", "description_es", "images", "details", "features", "features_es",
 ]
 
 

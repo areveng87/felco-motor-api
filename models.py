@@ -28,10 +28,12 @@ class Car(Base):
     color = Column(String(80))
     body = Column(String(60))
     location = Column(String(120))
-    description = Column(Text)
+    description = Column(Text)                            # descripcion original (EN)
+    description_es = Column(Text)                         # descripcion traducida (ES)
     images = Column(JSON, default=list)
     details = Column(JSON, default=dict)                 # todas las specs de la ficha (clave->valor)
-    features = Column(JSON, default=list)                # equipamiento / opciones
+    features = Column(JSON, default=list)                # equipamiento / opciones (EN)
+    features_es = Column(JSON, default=list)             # equipamiento traducido (ES)
     status = Column(String(20), default="available")    # available | sold
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

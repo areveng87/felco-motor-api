@@ -15,14 +15,32 @@ from sqlalchemy.orm import Session
 
 import models
 import scraper
+import translate
 from database import Base, SessionLocal, engine
 
 # Campos que se actualizan de un coche existente (no tocamos id/created_at)
 UPDATABLE = [
     "make", "model", "version", "year", "price", "monthly_payment", "mileage", "fuel",
     "transmission", "power", "doors", "color", "body", "location",
-    "description", "images", "details", "features",
+    "description", "description_es", "images", "details", "features", "features_es",
 ]
+
+
+def _fill_translation(c: dict, existing=None) -> None:
+    """Rellena description_es y features_es (EN->ES) con DeepL.
+    Solo traduce si es nuevo o si cambio la descripcion, para ahorrar cuota."""
+    changed = (
+        existing is None
+        or (c.get("description") or "") != (existing.description or "")
+        or not getattr(existing, "description_es", None)
+    )
+    if changed:
+        c["description_es"] = translate.translate_text(c.get("description", "") or "")
+        feats = c.get("features") or []
+        c["features_es"] = translate.translate_texts(feats) if feats else []
+    else:
+        c["description_es"] = existing.description_es
+        c["features_es"] = existing.features_es or []
 
 
 def sync_inventory(db: Session, cars: List[dict]) -> dict:
@@ -38,12 +56,14 @@ def sync_inventory(db: Session, cars: List[dict]) -> dict:
 
         existing = db.query(models.Car).filter(models.Car.vin == vin).first()
         if existing:
+            _fill_translation(c, existing)
             for k in UPDATABLE:
                 if k in c:
                     setattr(existing, k, c[k])
             existing.status = "available"
             updated += 1
         else:
+            _fill_translation(c, None)
             db.add(models.Car(vin=vin, status="available",
                               **{k: c.get(k) for k in UPDATABLE if c.get(k) is not None}))
             created += 1
