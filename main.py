@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
+import mailer
 import models
 import notifications
 import schemas
@@ -259,6 +260,120 @@ def remove_favorite(car_id: str, user=Depends(get_current_user), db: Session = D
         db.commit()
 
 
+# ---------- Alertas (busquedas guardadas + propuestas por email) ----------
+
+def _alert_matches(db: Session, crit: dict):
+    """Query de coches disponibles que cumplen los criterios de una alerta."""
+    q = db.query(models.Car).filter(models.Car.status != "sold")
+    s = crit or {}
+    if s.get("q"):
+        like = f"%{s['q']}%"
+        q = q.filter(models.Car.make.ilike(like) | models.Car.model.ilike(like) | models.Car.version.ilike(like))
+    if s.get("make"):
+        q = q.filter(models.Car.make == s["make"])
+    if s.get("model"):
+        q = q.filter(models.Car.model == s["model"])
+    if s.get("year"):
+        try:
+            q = q.filter(models.Car.year == int(s["year"]))
+        except ValueError:
+            pass
+    if s.get("body"):
+        if s["body"] == "Hybrid":
+            q = q.filter(models.Car.fuel == "Híbrido")
+        else:
+            q = q.filter(models.Car.body == s["body"])
+
+    def _num(key):
+        try:
+            return float(s[key])
+        except (KeyError, ValueError, TypeError):
+            return None
+
+    mn, mx = _num("minPrice"), _num("maxPrice")
+    if mn is not None:
+        q = q.filter(models.Car.price >= mn)
+    if mx is not None:
+        q = q.filter(models.Car.price <= mx)
+    return q
+
+
+def _process_alert(db: Session, alert: "models.Alert", limit: int = 20) -> int:
+    """Envia por email los coches que cumplen la alerta y aun no se enviaron."""
+    sent = {r.car_id for r in db.query(models.AlertSent).filter_by(alert_id=alert.id).all()}
+    matches = [c for c in _alert_matches(db, alert.criteria or {}).all() if c.id not in sent][:limit]
+    if not matches:
+        return 0
+    html = mailer.build_alert_html(alert.name, matches)
+    if not mailer.send_email(alert.email, f"FercoMotors · {alert.name}", html):
+        return 0
+    for c in matches:
+        db.add(models.AlertSent(alert_id=alert.id, car_id=c.id))
+    db.commit()
+    return len(matches)
+
+
+def process_alerts(db: Session) -> None:
+    for a in db.query(models.Alert).all():
+        try:
+            _process_alert(db, a)
+        except Exception as e:  # noqa: BLE001
+            print("Error procesando alerta:", e)
+
+
+def _process_alert_bg(alert_id: str) -> None:
+    db = SessionLocal()
+    try:
+        a = db.get(models.Alert, alert_id)
+        if a:
+            _process_alert(db, a)
+    except Exception as e:  # noqa: BLE001
+        print("Error alerta bg:", e)
+    finally:
+        db.close()
+
+
+@app.get("/v1/alerts", response_model=List[schemas.AlertOut])
+def list_alerts(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.Alert).filter_by(user_uid=user["uid"]).order_by(models.Alert.created_at.asc()).all()
+
+
+@app.post("/v1/alerts", response_model=schemas.AlertOut, status_code=status.HTTP_201_CREATED)
+def create_alert(payload: schemas.AlertIn, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    existing = db.query(models.Alert).filter_by(user_uid=user["uid"]).all()
+    names = {a.name for a in existing}
+
+    name = (payload.name or "").strip()
+    if not name:
+        n = len(existing) + 1
+        name = f"Alerta {n}"
+        while name in names:
+            n += 1
+            name = f"Alerta {n}"
+    if name in names:
+        raise HTTPException(status_code=409, detail="Ya tienes una alerta con ese nombre")
+
+    email = user.get("email") or ""
+    criteria = {k: str(v) for k, v in (payload.criteria or {}).items() if v not in (None, "", "0")}
+    alert = models.Alert(user_uid=user["uid"], email=email, name=name, criteria=criteria)
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+
+    # Envio inicial de propuestas en segundo plano (no bloquea la respuesta).
+    threading.Thread(target=_process_alert_bg, args=(alert.id,), daemon=True).start()
+    return alert
+
+
+@app.delete("/v1/alerts/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_alert(alert_id: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    a = db.query(models.Alert).filter_by(id=alert_id, user_uid=user["uid"]).first()
+    if a is not None:
+        db.query(models.AlertSent).filter_by(alert_id=a.id).delete()
+        db.delete(a)
+        db.commit()
+
+
 @app.get("/v1/devices")
 def list_devices(user=Depends(get_current_user), db: Session = Depends(get_db)):
     """Lista los dispositivos (tokens) registrados por el usuario. Util para verificar."""
@@ -345,9 +460,9 @@ def _run_sync_job(max_pages, max_cars):
     try:
         stats = sync_module.run(max_pages=max_pages, max_cars=max_cars)
         print("Sync terminado:", stats)
-        if stats.get("created", 0) > 0:
-            db = SessionLocal()
-            try:
+        db = SessionLocal()
+        try:
+            if stats.get("created", 0) > 0:
                 n = stats["created"]
                 _notify_all(
                     db,
@@ -355,8 +470,10 @@ def _run_sync_job(max_pages, max_cars):
                     f"{n} coche{'s' if n != 1 else ''} nuevo{'s' if n != 1 else ''} disponible{'s' if n != 1 else ''}.",
                     {"type": "new_cars"},
                 )
-            finally:
-                db.close()
+            # Revisar alertas y enviar propuestas por email (coches nuevos que cumplan).
+            process_alerts(db)
+        finally:
+            db.close()
     except Exception as e:  # noqa: BLE001
         print("Error en la sincronizacion:", e)
     finally:

@@ -55,6 +55,19 @@ class DeviceIn(BaseModel):
     platform: Optional[str] = "android"
 
 
+class AlertIn(BaseModel):
+    name: Optional[str] = None
+    criteria: Dict[str, str] = {}     # q, make, model, year, body, minPrice, maxPrice
+
+
+class AlertOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    email: str
+    criteria: Dict[str, str] = {}
+
+
 class NotifyIn(BaseModel):
     title: str
     body: str

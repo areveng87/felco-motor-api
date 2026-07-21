@@ -72,3 +72,25 @@ class ContactMessage(Base):
     phone = Column(String(60))
     message = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id = Column(String(32), primary_key=True, default=new_id)
+    user_uid = Column(String(128), index=True, nullable=False)
+    email = Column(String(160), nullable=False)          # a donde se envian las propuestas
+    name = Column(String(120), nullable=False)
+    criteria = Column(JSON, default=dict)                # q, make, model, year, body, minPrice, maxPrice
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AlertSent(Base):
+    __tablename__ = "alert_sent"
+
+    id = Column(String(32), primary_key=True, default=new_id)
+    alert_id = Column(String(32), index=True, nullable=False)
+    car_id = Column(String(32), nullable=False)
+    sent_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("alert_id", "car_id", name="uq_alert_car"),)
