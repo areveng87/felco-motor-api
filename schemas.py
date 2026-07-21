@@ -57,7 +57,9 @@ class DeviceIn(BaseModel):
 
 class AlertIn(BaseModel):
     name: Optional[str] = None
-    criteria: Dict[str, str] = {}     # q, make, model, year, body, minPrice, maxPrice
+    # Se acepta cualquier dict (o null) y se normaliza a strings en el endpoint,
+    # para no rechazar por tipos (evita 422 por un numero en el criterio).
+    criteria: Optional[dict] = None   # q, make, model, year, body, minPrice, maxPrice
 
 
 class AlertOut(BaseModel):
