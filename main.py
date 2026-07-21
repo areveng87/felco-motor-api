@@ -27,6 +27,7 @@ import models
 import notifications
 import schemas
 import sync as sync_module
+import translate
 from auth import get_current_user
 from database import Base, SessionLocal, engine
 
@@ -172,6 +173,23 @@ def get_car(car_id: str, db: Session = Depends(get_db)):
     car = db.get(models.Car, car_id)
     if car is None:
         raise HTTPException(status_code=404, detail="Coche no encontrado")
+    return car
+
+
+@app.post("/v1/cars/{car_id}/translate", response_model=schemas.CarOut)
+def translate_car(car_id: str, db: Session = Depends(get_db)):
+    """Traduce (EN->ES) la descripcion y el equipamiento de un coche BAJO DEMANDA
+    y lo guarda. Idempotente: si ya esta traducido, no vuelve a gastar credito."""
+    car = db.get(models.Car, car_id)
+    if car is None:
+        raise HTTPException(status_code=404, detail="Coche no encontrado")
+
+    if not (car.description_es or "").strip():
+        car.description_es = translate.translate_text(car.description or "")
+        feats = car.features or []
+        car.features_es = translate.translate_texts(feats) if feats else []
+        db.commit()
+        db.refresh(car)
     return car
 
 
