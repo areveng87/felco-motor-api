@@ -148,13 +148,26 @@ def _send_smtp(to: str, subject: str, html: str) -> bool:
     return False
 
 
+def _car_url(c) -> str:
+    """Deriva el enlace a la ficha del coche en fercomotors.com (por VIN)."""
+    vin = (getattr(c, "vin", "") or "").lower()
+    if not vin:
+        return "https://fercomotors.com"
+
+    def slug(s):
+        return (s or "").strip().lower().replace(" ", "-")
+
+    mk, md = slug(c.make), slug(c.model)
+    return f"https://fercomotors.com/used-{mk}/{c.year}-{mk}-{md}-miami-fl-{vin}"
+
+
 def build_alert_html(alert_name: str, cars) -> str:
     rows = []
     for c in cars:
         price = f"${int(c.price):,}" if c.price else ""
         img = (c.images or [None])[0] if c.images else None
         img_tag = f'<img src="{img}" width="180" style="border-radius:8px;display:block;margin-bottom:6px">' if img else ""
-        url = c.source_url if getattr(c, "source_url", None) else "https://fercomotors.com"
+        url = _car_url(c)
         rows.append(
             f'<div style="margin:0 0 18px 0;font-family:Arial,sans-serif">'
             f'{img_tag}'
