@@ -63,6 +63,8 @@ class TestDriveIn(BaseModel):
     comments: Optional[str] = None
     car_title: Optional[str] = None
     car_vin: Optional[str] = None
+    purpose: Optional[str] = None            # test_drive | availability
+    to: Optional[str] = None                 # destinatario (viene de Remote Config)
 
 
 class AlertIn(BaseModel):

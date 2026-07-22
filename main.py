@@ -438,31 +438,42 @@ def notify(payload: schemas.NotifyIn, x_sync_token: Optional[str] = Header(None)
 
 @app.post("/v1/test-drive", status_code=status.HTTP_202_ACCEPTED)
 def schedule_test_drive(payload: schemas.TestDriveIn, db: Session = Depends(get_db)):
-    """Solicitud de test drive: se guarda y se avisa a Ferco por email."""
+    """Test drive o consulta de disponibilidad: se guarda y se avisa por email."""
+    is_availability = (payload.purpose or "").lower() == "availability"
+    label = "CONSULTA DISPONIBILIDAD" if is_availability else "TEST DRIVE"
+
     msg = models.ContactMessage(
         car_id=payload.car_vin,
         car_title=payload.car_title,
         name=payload.name,
         email=payload.email,
         phone=payload.phone,
-        message=(f"[TEST DRIVE] Preferencia: {payload.preferred_time or '-'}\n"
+        message=(f"[{label}] Preferencia: {payload.preferred_time or '-'}\n"
                  f"Coche: {payload.car_title or '-'} (VIN {payload.car_vin or '-'})\n"
                  f"Comentarios: {payload.comments or '-'}"),
     )
     db.add(msg)
     db.commit()
 
-    to = os.getenv("TEST_DRIVE_TO", "info@fercomotors.com")
+    # Destinatario: Remote Config (lo manda la app en 'to') > env TEST_DRIVE_TO > defecto.
+    to = (payload.to or "").strip() or os.getenv("TEST_DRIVE_TO", "").strip() \
+        or "repreply@fercomotors.dsmessage.com"
+
+    subject = "Consulta de disponibilidad - FercoMotors app" if is_availability \
+        else "Test drive - FercoMotors app"
+
+    car_line = (f"<b>Coche:</b> {payload.car_title or '-'} (VIN {payload.car_vin or '-'})<br>"
+                if payload.car_title or payload.car_vin else "")
     html = (
-        "<h3>Nueva solicitud de test drive (app)</h3>"
+        f"<h3>Nueva {'consulta de disponibilidad' if is_availability else 'solicitud de test drive'} (app)</h3>"
         f"<p><b>Nombre:</b> {payload.name}<br>"
         f"<b>Teléfono:</b> {payload.phone or '-'}<br>"
         f"<b>Email:</b> {payload.email}<br>"
         f"<b>Preferencia:</b> {payload.preferred_time or '-'}<br>"
-        f"<b>Coche:</b> {payload.car_title or '-'} (VIN {payload.car_vin or '-'})<br>"
+        f"{car_line}"
         f"<b>Comentarios:</b> {payload.comments or '-'}</p>"
     )
-    mailer.send_email(to, "Test drive - FercoMotors app", html)
+    mailer.send_email(to, subject, html)
     return {"id": msg.id}
 
 
