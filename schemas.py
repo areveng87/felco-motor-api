@@ -55,6 +55,16 @@ class DeviceIn(BaseModel):
     platform: Optional[str] = "android"
 
 
+class TestDriveIn(BaseModel):
+    name: str
+    email: str
+    phone: Optional[str] = None
+    preferred_time: Optional[str] = None     # Morning | Afternoon | Evening
+    comments: Optional[str] = None
+    car_title: Optional[str] = None
+    car_vin: Optional[str] = None
+
+
 class AlertIn(BaseModel):
     name: Optional[str] = None
     # Se acepta cualquier dict (o null) y se normaliza a strings en el endpoint,

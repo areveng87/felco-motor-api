@@ -436,6 +436,36 @@ def notify(payload: schemas.NotifyIn, x_sync_token: Optional[str] = Header(None)
     return _notify_all(db, payload.title, payload.body, data)
 
 
+@app.post("/v1/test-drive", status_code=status.HTTP_202_ACCEPTED)
+def schedule_test_drive(payload: schemas.TestDriveIn, db: Session = Depends(get_db)):
+    """Solicitud de test drive: se guarda y se avisa a Ferco por email."""
+    msg = models.ContactMessage(
+        car_id=payload.car_vin,
+        car_title=payload.car_title,
+        name=payload.name,
+        email=payload.email,
+        phone=payload.phone,
+        message=(f"[TEST DRIVE] Preferencia: {payload.preferred_time or '-'}\n"
+                 f"Coche: {payload.car_title or '-'} (VIN {payload.car_vin or '-'})\n"
+                 f"Comentarios: {payload.comments or '-'}"),
+    )
+    db.add(msg)
+    db.commit()
+
+    to = os.getenv("TEST_DRIVE_TO", "info@fercomotors.com")
+    html = (
+        "<h3>Nueva solicitud de test drive (app)</h3>"
+        f"<p><b>Nombre:</b> {payload.name}<br>"
+        f"<b>Teléfono:</b> {payload.phone or '-'}<br>"
+        f"<b>Email:</b> {payload.email}<br>"
+        f"<b>Preferencia:</b> {payload.preferred_time or '-'}<br>"
+        f"<b>Coche:</b> {payload.car_title or '-'} (VIN {payload.car_vin or '-'})<br>"
+        f"<b>Comentarios:</b> {payload.comments or '-'}</p>"
+    )
+    mailer.send_email(to, "Test drive - FercoMotors app", html)
+    return {"id": msg.id}
+
+
 @app.post("/v1/contact", status_code=status.HTTP_202_ACCEPTED)
 def send_contact(payload: schemas.ContactIn, db: Session = Depends(get_db)):
     msg = models.ContactMessage(
